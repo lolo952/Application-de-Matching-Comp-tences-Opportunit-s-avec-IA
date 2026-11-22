@@ -2,12 +2,14 @@
 
 Lancer (depuis la racine du projet) :
     uvicorn api:app --app-dir src --reload
-Documentation interactive : http://127.0.0.1:8000/docs
+Interface : http://127.0.0.1:8000/   |   Documentation : http://127.0.0.1:8000/docs
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from engine import Engine
@@ -44,6 +46,11 @@ class JobOut(BaseModel):
     score: float
     semantic_score: float
     common_skills: List[str]
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
 @app.get("/health")
