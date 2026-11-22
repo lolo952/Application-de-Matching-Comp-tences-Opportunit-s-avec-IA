@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matching Compétences-Opportunités</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f6f8; color: #1f2933; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; color: #52606d; }
+  form, .card { background: #fff; border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  input[type=text], textarea, select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; }
+  textarea { min-height: 70px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+  .checks label { display: inline-block; font-weight: 400; margin: 4px 14px 0 0; }
+  button { margin-top: 18px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; padding: 10px 22px; font: inherit; cursor: pointer; }
+  button:disabled { background: #94a3b8; cursor: wait; }
+  #results { margin-top: 24px; display: grid; gap: 12px; }
+  .card h3 { margin: 0 0 4px; font-size: 1.05rem; }
+  .meta { color: #52606d; font-size: .9rem; }
+  .tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 12px; padding: 2px 10px; margin: 6px 6px 0 0; font-size: .8rem; }
+  .score { float: right; font-weight: 700; color: #047857; }
+  .msg { color: #52606d; }
+  .err { color: #b91c1c; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Matching Compétences-Opportunités</h1>
+  <p class="sub">Renseignez votre profil : l'application propose les offres les plus proches.</p>
+
+  <form id="f">
+    <label for="skills">Compétences *</label>
+    <input type="text" id="skills" required placeholder="Python SQL React">
+
+    <label for="experience">Expérience</label>
+    <textarea id="experience" placeholder="Développeur web, 2 ans"></textarea>
+
+    <label for="desired">Domaine recherché</label>
+    <input type="text" id="desired" placeholder="Informatique">
+
+    <div class="row">
+      <div>
+        <label for="city">Ville *</label>
+        <input type="text" id="city" required placeholder="Rabat">
+      </div>
+      <div>
+        <label for="mobility">Mobilité (autres villes, séparées par des virgules)</label>
+        <input type="text" id="mobility" placeholder="Tangier, Casablanca">
+      </div>
+    </div>
+
+    <label>Contrats recherchés *</label>
+    <div class="checks" id="contracts">
+      <label><input type="checkbox" value="CDI" checked> CDI</label>
+      <label><input type="checkbox" value="CDD" checked> CDD</label>
+      <label><input type="checkbox" value="Freelance"> Freelance</label>
+      <label><input type="checkbox" value="Stage"> Stage</label>
+    </div>
+
+    <button id="go" type="submit">Trouver des offres</button>
+  </form>
+
+  <div id="results"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;   // textContent : pas d'injection HTML
+  return e;
+}
+
+function show(msg, cls) {
+  const box = $("results");
+  box.replaceChildren(el("p", cls || "msg", msg));
+}
+
+$("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const contracts = [...document.querySelectorAll("#contracts input:checked")].map((c) => c.value);
+  if (!contracts.length) { show("Choisissez au moins un type de contrat.", "err"); return; }
+
+  const body = {
+    skills: $("skills").value.trim(),
+    experience: $("experience").value.trim(),
+    desired_fields: $("desired").value.trim(),
+    city: $("city").value.trim(),
+    mobility: $("mobility").value.split(",").map((s) => s.trim()).filter(Boolean),
+    contracts: contracts,
+    k: 5,
+  };
+
+  $("go").disabled = true;
+  show("Recherche en cours…");
+  try {
+    const r = await fetch("/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error("Erreur " + r.status);
+    const jobs = await r.json();
+    if (!jobs.length) {
+      show("Aucune offre trouvée. Essayez d'ajouter des villes de mobilité ou d'autres types de contrat.");
+      return;
+    }
+    const box = $("results");
+    box.replaceChildren();
+    for (const j of jobs) {
+      const c = el("div", "card");
+      c.appendChild(el("span", "score", Math.round(j.score * 100) + " %"));
+      c.appendChild(el("h3", "", j.title));
+      c.appendChild(el("div", "meta", j.role + " · " + j.city + " · " + j.work_type));
+      for (const s of j.common_skills) c.appendChild(el("span", "tag", s));
+      box.appendChild(c);
+    }
+  } catch (e) {
+    show("Impossible de joindre l'API : " + e.message, "err");
+  } finally {
+    $("go").disabled = false;
+  }
+});
+</script>
+</body>
+</html>
