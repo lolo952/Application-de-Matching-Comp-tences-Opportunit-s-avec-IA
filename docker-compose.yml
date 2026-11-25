@@ -1,0 +1,13 @@
+services:
+  matching:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # les données ne sont pas dans l'image (elles contiennent des CV) : on les monte en lecture seule
+      - ./data/processed:/app/data/processed:ro
+      # cache du modèle : évite de le retélécharger à chaque démarrage
+      - hf_cache:/root/.cache/huggingface
+
+volumes:
+  hf_cache:
